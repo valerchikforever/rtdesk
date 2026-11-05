@@ -36,7 +36,8 @@ jobs:
           persist-credentials: false
       - name: Install toolchain (rust-toolchain.toml)
         run: rustup toolchain install
-      - name: Build (no cache: release builds start clean)
+      # No build cache on purpose: release builds start clean.
+      - name: Build
         run: cargo build --release --locked ${{ matrix.packages }}
       - name: Package (Windows)
         if: runner.os == 'Windows'

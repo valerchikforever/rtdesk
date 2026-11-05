@@ -7,7 +7,9 @@ use std::path::Path;
 use zeroize::Zeroizing;
 
 use crate::keys::DeviceKey;
-use crate::{CryptoError, Result};
+#[cfg(windows)]
+use crate::CryptoError;
+use crate::Result;
 
 /// Load the device key from `path`, creating and protecting a new one if absent.
 pub fn load_or_create_device_key(path: &Path) -> Result<DeviceKey> {
