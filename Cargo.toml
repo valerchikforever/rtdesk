@@ -39,7 +39,7 @@ base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 clap = { version = "4", features = ["derive"] }
-dirs = "5"
+dirs = "7"
 jpeg-encoder = "0.6"
 zune-jpeg = "0.4"
 zune-core = "0.4"
