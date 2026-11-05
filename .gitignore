@@ -1,0 +1,5 @@
+/target
+/data
+*.key
+*.secret
+.obsidian/workspace*.json

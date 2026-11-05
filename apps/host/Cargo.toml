@@ -1,0 +1,22 @@
+[package]
+name = "bridge-host"
+description = "Bridge host agent (MVP: portable, attended mode, Windows)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bridge-proto.workspace = true
+bridge-crypto.workspace = true
+bridge-session.workspace = true
+bridge-codec.workspace = true
+bridge-net.workspace = true
+bridge-platform.workspace = true
+quinn.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+arboard.workspace = true

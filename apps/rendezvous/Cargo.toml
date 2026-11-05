@@ -1,0 +1,21 @@
+[package]
+name = "bridge-rendezvous"
+description = "Bridge rendezvous server: device registry, presence, lookup, hole-punch coordination, relay tokens"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bridge-proto.workspace = true
+bridge-crypto.workspace = true
+bridge-net.workspace = true
+quinn.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rand.workspace = true

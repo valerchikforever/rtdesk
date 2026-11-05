@@ -1,0 +1,11 @@
+[package]
+name = "bridge-session"
+description = "Host-side session state machine, permission enforcement and auth rate limiting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bridge-proto.workspace = true
+thiserror.workspace = true

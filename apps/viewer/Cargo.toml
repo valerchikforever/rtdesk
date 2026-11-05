@@ -1,0 +1,23 @@
+[package]
+name = "bridge-viewer"
+description = "Bridge viewer — connect to and control a remote computer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bridge-proto.workspace = true
+bridge-crypto.workspace = true
+bridge-session.workspace = true
+bridge-codec.workspace = true
+bridge-net.workspace = true
+quinn.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+arboard.workspace = true
+winit.workspace = true
+softbuffer.workspace = true

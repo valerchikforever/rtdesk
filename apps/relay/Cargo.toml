@@ -1,0 +1,16 @@
+[package]
+name = "bridge-relay"
+description = "Bridge blind UDP relay: pairs two token-authorized peers and forwards opaque QUIC packets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bridge-proto.workspace = true
+bridge-crypto.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+clap.workspace = true

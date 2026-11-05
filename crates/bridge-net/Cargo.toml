@@ -1,0 +1,19 @@
+[package]
+name = "bridge-net"
+description = "QUIC endpoints, rendezvous client, NAT punching, blind relay proxy, client config & key pinning"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bridge-proto.workspace = true
+bridge-crypto.workspace = true
+quinn.workspace = true
+rustls.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+dirs.workspace = true

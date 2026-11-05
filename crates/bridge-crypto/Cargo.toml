@@ -1,0 +1,24 @@
+[package]
+name = "bridge-crypto"
+description = "Device identity, TLS key pinning, PAKE, one-time codes and relay tokens"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ring.workspace = true
+rustls.workspace = true
+rcgen.workspace = true
+x509-parser.workspace = true
+spake2.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+subtle.workspace = true
+zeroize.workspace = true
+rand.workspace = true
+base64.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
