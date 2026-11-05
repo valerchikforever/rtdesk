@@ -21,7 +21,7 @@ jobs:
     name: Windows — fmt, clippy, test, build
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Install toolchain (rust-toolchain.toml)
@@ -44,7 +44,7 @@ jobs:
           - name: macOS
             os: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: System libraries (gamepad input via libudev)
@@ -65,7 +65,7 @@ jobs:
     name: Dependencies — licences, advisories, sources
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: EmbarkStudios/cargo-deny-action@v2
@@ -74,7 +74,7 @@ jobs:
     name: Fuzz (60 s per target)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - run: rustup toolchain install nightly --profile minimal
