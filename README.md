@@ -58,6 +58,15 @@ bridge-viewer 123456789 --server YOUR_SERVER --server-key SERVER_KEY
 ```
 Enter the code, wait for the host user to accept. Close the window to disconnect.
 
+### Host requirements per OS
+| OS | Requirements | Not yet supported |
+|---|---|---|
+| Windows 10/11 | — (gamepads: ViGEmBus driver) | UAC prompts / elevated windows |
+| macOS 11+ | Allow **Screen Recording** and **Accessibility** for the app you start `bridge-host` from (e.g. Terminal) in System Settings → Privacy & Security, then restart it | Secondary displays, gamepads, login window |
+| Linux | An **Xorg/X11** session (choose it on the login screen) and `zenity` (or `kdialog` on KDE) for the consent dialog | Wayland sessions, gamepads |
+
+On macOS, the Windows key from a viewer becomes Command and Alt becomes Option.
+
 ### Games and 3D applications
 - **Relative mouse:** when a game or 3D viewport hides the cursor, the viewer locks your mouse and sends raw
   movement, so mouse-look and orbiting work. **Ctrl+Alt+M** toggles it manually and always releases the mouse;
@@ -81,8 +90,8 @@ docker run -d --name bridge-relay -p 21117:21117/udp -v bridge-data:/data bridge
 ```
 
 ## Known MVP limitations
-- Host (the computer being accessed): Windows only. Viewer: Windows, macOS, Linux.
-  macOS/Linux hosts and Android/iOS apps are planned (Beta / v1.x).
+- Host: Windows (tested), macOS and Linux/X11 (experimental, built in CI but not yet tested on real machines).
+  Android/iOS apps are planned (v1.x).
 - Portable/attended mode: no unattended access, no control of UAC prompts or elevated windows yet.
   Games running as administrator or with anti-cheat may ignore injected input.
 - Codec: JPEG dirty-tiles (patent-free, CPU); hardware H.264/HEVC/AV1 is planned.
@@ -95,9 +104,11 @@ Pre-built binaries are attached to [GitHub Releases](https://github.com/valerchi
 | Platform | File | Contains |
 |---|---|---|
 | Windows 10/11 x64 | `bridge-<ver>-windows-x64.zip` | host, viewer, rendezvous, relay |
-| macOS 11+ (Apple Silicon & Intel) | `bridge-<ver>-macos-universal.zip` | viewer, rendezvous, relay |
-| Linux x64 (glibc 2.35+) | `bridge-<ver>-linux-x64.tar.gz` | viewer, rendezvous, relay |
-| Linux ARM64 (e.g. Raspberry Pi) | `bridge-<ver>-linux-arm64.tar.gz` | viewer, rendezvous, relay |
+| macOS 11+ (Apple Silicon & Intel) | `bridge-<ver>-macos-universal.zip` | host*, viewer, rendezvous, relay |
+| Linux x64 (glibc 2.35+) | `bridge-<ver>-linux-x64.tar.gz` | host*, viewer, rendezvous, relay |
+| Linux ARM64 (e.g. Raspberry Pi) | `bridge-<ver>-linux-arm64.tar.gz` | host*, viewer, rendezvous, relay |
+
+\* experimental, see [host requirements](#host-requirements-per-os).
 
 Not yet code-signed: on Windows SmartScreen may warn; on macOS run once after unpacking
 ```bash

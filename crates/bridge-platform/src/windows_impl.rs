@@ -27,7 +27,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SM_YVIRTUALSCREEN, WM_CLOSE,
 };
 
-use crate::{Consent, InputEvent, PlatformError, Result};
+use crate::{Consent, InputEvent, PlatformError, Result, CONSENT_TITLE};
 
 /// Call once at startup: makes capture and input use physical pixels on scaled displays.
 pub fn init_process() {
@@ -265,9 +265,6 @@ fn send(inputs: &[INPUT]) -> Result<()> {
         Err(PlatformError::Os("SendInput blocked (elevated window focused?)".into()))
     }
 }
-
-/// Title of the consent dialog (used to close it on timeout / viewer departure).
-pub const CONSENT_TITLE: &str = "Bridge — incoming remote access request";
 
 /// Is the system cursor currently shown? Games and 3D viewports hide it while capturing the mouse.
 pub fn cursor_visible() -> bool {

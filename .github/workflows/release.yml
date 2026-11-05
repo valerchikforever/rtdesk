@@ -28,18 +28,18 @@ jobs:
           - name: windows-x64
             os: windows-latest
             bins: bridge-host bridge-viewer bridge-rendezvous bridge-relay
-          # macOS: viewer + servers, universal binary (Apple Silicon + Intel)
+          # macOS: host + viewer + servers, universal binary (Apple Silicon + Intel)
           - name: macos-universal
             os: macos-latest
-            bins: bridge-viewer bridge-rendezvous bridge-relay
-          # Linux: viewer + servers; built on 22.04 for compatibility with older glibc (Debian 12+, Ubuntu 22.04+)
+            bins: bridge-host bridge-viewer bridge-rendezvous bridge-relay
+          # Linux: host (X11) + viewer + servers; built on 22.04 for compatibility with older glibc (Debian 12+, Ubuntu 22.04+)
           - name: linux-x64
             os: ubuntu-22.04
-            bins: bridge-viewer bridge-rendezvous bridge-relay
+            bins: bridge-host bridge-viewer bridge-rendezvous bridge-relay
           # Linux ARM64: e.g. a Raspberry Pi 4/5 as a self-hosted server
           - name: linux-arm64
             os: ubuntu-22.04-arm
-            bins: bridge-viewer bridge-rendezvous bridge-relay
+            bins: bridge-host bridge-viewer bridge-rendezvous bridge-relay
     env:
       PKG: bridge-${{ github.ref_name }}-${{ matrix.name }}
       MACOSX_DEPLOYMENT_TARGET: "11.0"
@@ -127,11 +127,12 @@ jobs:
 
             | Download | Contains |
             |---|---|
-            | `windows-x64.zip` | **host** (PC to be accessed), viewer, servers |
-            | `macos-universal.zip` | viewer, servers (Apple Silicon + Intel, macOS 11+) |
-            | `linux-x64.tar.gz` / `linux-arm64.tar.gz` | viewer, servers |
+            | `windows-x64.zip` | host, viewer, servers (gamepads need ViGEmBus) |
+            | `macos-universal.zip` | host, viewer, servers (Apple Silicon + Intel, macOS 11+) |
+            | `linux-x64.tar.gz` / `linux-arm64.tar.gz` | host (X11 sessions; needs zenity or kdialog), viewer, servers |
 
-            The host (being accessed) is Windows-only for now; macOS/Linux hosts and mobile apps are on the roadmap.
+            **macOS/Linux hosts are new and experimental.** macOS host needs Screen Recording + Accessibility permissions.
+            Linux host: Xorg sessions only (no Wayland yet). Gamepad forwarding to macOS/Linux hosts is not available yet.
 
             **Verify your download:** compare with `SHA256SUMS`, and check build provenance with
             `gh attestation verify <file> --repo ${{ github.repository }}`.

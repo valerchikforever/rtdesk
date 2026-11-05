@@ -1,8 +1,9 @@
+//! Fallback for operating systems without a host backend: everything fails safely (no capture,
+//! no input, consent always rejected).
+
 use crate::{Consent, InputEvent, PlatformError, Result};
 
 pub fn init_process() {}
-
-pub const CONSENT_TITLE: &str = "Bridge — incoming remote access request";
 
 pub struct ScreenCapturer;
 

@@ -33,7 +33,7 @@ jobs:
       - run: cargo build --workspace --release --locked
 
   unix:
-    name: ${{ matrix.name }} — libraries, servers, viewer
+    name: ${{ matrix.name }} — libraries, servers, host, viewer
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -57,9 +57,9 @@ jobs:
         run: >
           cargo test --locked
           -p bridge-proto -p bridge-crypto -p bridge-session -p bridge-codec
-          -p bridge-net -p bridge-platform -p bridge-rendezvous -p bridge-relay -p bridge-viewer
-      - run: cargo clippy --locked --all-targets -p bridge-viewer -p bridge-rendezvous -p bridge-relay
-      - run: cargo build --release --locked -p bridge-viewer -p bridge-rendezvous -p bridge-relay
+          -p bridge-net -p bridge-platform -p bridge-rendezvous -p bridge-relay -p bridge-viewer -p bridge-host
+      - run: cargo clippy --locked --all-targets -p bridge-platform -p bridge-host -p bridge-viewer -p bridge-rendezvous -p bridge-relay
+      - run: cargo build --release --locked -p bridge-host -p bridge-viewer -p bridge-rendezvous -p bridge-relay
 
   deny:
     name: Dependencies — licences, advisories, sources

@@ -25,12 +25,21 @@ updated: 2026-11-05
 | `apps/host` | Host agent (portable attended mode) | [[Host Agent]] |
 | `apps/viewer` | Viewer (winit + softbuffer) | [[Viewer Client]] |
 
-## Platform matrix (v0.2.0, 2026-11-05)
+## Platform matrix (v0.3.0, 2026-11-05)
 | Platform | Host (being accessed) | Viewer | Servers | Built in CI | Tested live |
 |---|---|---|---|---|---|
 | Windows 10/11 x64 | ✅ | ✅ | ✅ | ✅ | ✅ (single PC) |
-| macOS 11+ universal | ❌ (ScreenCaptureKit + CGEvent, Beta) | ✅ | ✅ | ✅ | ❌ |
-| Linux x64 / ARM64 | ❌ (PipeWire portal / X11, Beta) | ✅ | ✅ | ✅ | ❌ |
+| macOS 11+ universal | 🧪 CoreGraphics capture, CGEvent input, osascript dialogs | ✅ | ✅ | ✅ | ❌ |
+| Linux x64 / ARM64 | 🧪 X11 GetImage + XFixes cursor, XTest input, zenity/kdialog | ✅ | ✅ | ✅ | ❌ |
+
+### macOS / Linux host backends (experimental)
+- Same security model as Windows: consent dialog (default = reject; killed/failed dialog = reject), always-visible session indicator with Disconnect, host-side state machine unchanged.
+- Dialog text is passed via argv only (no shell, no script interpolation) — `crates/bridge-platform/src/unix_dialog.rs`.
+- Key translation set-1 → kVK (macOS) / evdev (Linux) in `keymaps.rs`, unit-tested on every OS.
+- **macOS:** needs Screen Recording + Accessibility (TCC; attributed to the launching app, e.g. Terminal). Main display only, cursor not drawn into the image, `CGDisplayCreateImage` is deprecated → ScreenCaptureKit next. Drag uses `*MouseDragged` events, double-click via click-state field, relative mode sets `MOUSE_EVENT_DELTA_X/Y`.
+- **Linux:** Xorg sessions only; Wayland is refused with a clear message (portal/PipeWire backend next). Without zenity/kdialog every request is rejected.
+- No virtual gamepads on macOS/Linux yet (uinput on Linux is the candidate).
+- Verified: `cargo clippy -D warnings` for aarch64-apple-darwin and x86_64-unknown-linux-gnu from Windows, CI builds on macOS/Linux runners. **Not yet run on real macOS/Linux machines.**
 | Android | ❌ (MediaProjection + Accessibility, v1.x) | ❌ needs touch UI | — | ❌ | ❌ |
 | iOS | not possible (no screen-control APIs) | ❌ needs touch UI + Apple Developer account | — | ❌ | ❌ |
 
