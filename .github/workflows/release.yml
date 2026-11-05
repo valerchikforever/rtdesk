@@ -44,7 +44,7 @@ jobs:
       PKG: bridge-${{ github.ref_name }}-${{ matrix.name }}
       MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: System libraries
