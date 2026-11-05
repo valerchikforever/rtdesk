@@ -96,7 +96,7 @@ jobs:
           cp LICENSE README.md SECURITY.md "pkg/$PKG/"
           tar -C pkg -czf "dist/$PKG.tar.gz" "$PKG"
 
-      - uses: actions/attest-build-provenance@v1
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/*
       - uses: actions/upload-artifact@v4
