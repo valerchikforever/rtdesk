@@ -1,0 +1,47 @@
+[package]
+name = "bridge-fuzz"
+version = "0.0.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+prost = "0.13"
+bridge-proto = { path = "../crates/bridge-proto" }
+bridge-session = { path = "../crates/bridge-session" }
+bridge-codec = { path = "../crates/bridge-codec" }
+
+# Standalone: not part of the main workspace (needs nightly + sanitizers).
+[workspace]
+
+[[bin]]
+name = "relay_parse"
+path = "fuzz_targets/relay_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "session_admit"
+path = "fuzz_targets/session_admit.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "frame_decode"
+path = "fuzz_targets/frame_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "rendezvous_decode"
+path = "fuzz_targets/rendezvous_decode.rs"
+test = false
+doc = false
+bench = false

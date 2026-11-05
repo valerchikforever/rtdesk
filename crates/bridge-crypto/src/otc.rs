@@ -14,11 +14,7 @@ pub fn generate() -> String {
 
 /// `ABCDEFGHJ` → `ABC-DEF-GHJ`
 pub fn display(code: &str) -> String {
-    code.as_bytes()
-        .chunks(3)
-        .map(|c| String::from_utf8_lossy(c).into_owned())
-        .collect::<Vec<_>>()
-        .join("-")
+    code.as_bytes().chunks(3).map(|c| String::from_utf8_lossy(c).into_owned()).collect::<Vec<_>>().join("-")
 }
 
 /// Accepts user input with spaces/dashes/lowercase.

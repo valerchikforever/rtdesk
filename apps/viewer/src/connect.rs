@@ -155,7 +155,14 @@ async fn authenticate(
     host_key: keys::PublicKey,
     code: &str,
 ) -> Result<SessionGranted> {
-    send_ctrl(send, Kind::Hello(Hello { version: PROTOCOL_VERSION, agent: concat!("bridge-viewer/", env!("CARGO_PKG_VERSION")).into() })).await?;
+    send_ctrl(
+        send,
+        Kind::Hello(Hello {
+            version: PROTOCOL_VERSION,
+            agent: concat!("bridge-viewer/", env!("CARGO_PKG_VERSION")).into(),
+        }),
+    )
+    .await?;
     let pctx = PakeContext { channel_binding: channel_binding(conn)?, host_pub: host_key, viewer_pub: key.public() };
     let (state, out) = pake::start(code, &pctx);
     send_ctrl(send, Kind::PakeMsg(PakeMsg { msg: out })).await?;
@@ -176,7 +183,10 @@ async fn authenticate(
     }
     println!("Code accepted. Waiting for the remote user to allow the connection…");
 
-    match tokio::time::timeout(Duration::from_secs(120), recv_ctrl(recv)).await.context("no answer from the remote user")?? {
+    match tokio::time::timeout(Duration::from_secs(120), recv_ctrl(recv))
+        .await
+        .context("no answer from the remote user")??
+    {
         Kind::Granted(g) => Ok(g),
         Kind::Denied(d) => bail!("access denied: {}", d.reason),
         other => bail!("unexpected {} from host", other.name()),

@@ -1,5 +1,8 @@
 # Bridge — free, open-source, secure remote desktop
 
+[![CI](https://github.com/valerchikforever/rtdesk/actions/workflows/ci.yml/badge.svg)](https://github.com/valerchikforever/rtdesk/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+
 Bridge is a **completely free** (AGPL-3.0), self-hostable remote desktop in the spirit of RustDesk,
 designed security-first: the servers can never see your screen, keystrokes or codes.
 
@@ -75,6 +78,19 @@ docker run -d --name bridge-relay -p 21117:21117/udp -v bridge-data:/data bridge
 - Console UI; the graphical UI (Flutter, ADR-004) is planned.
 - IPv4 only.
 
+## Downloads
+Pre-built binaries are attached to [GitHub Releases](https://github.com/valerchikforever/rtdesk/releases).
+Verify them before use:
+```bash
+sha256sum -c SHA256SUMS
+```
+```bash
+gh attestation verify bridge-v0.1.0-x86_64-pc-windows-msvc.zip --repo valerchikforever/rtdesk
+```
+Maintainers: push a tag such as `v0.1.0` to build a draft release.
+
+## Contributing & security
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately — see [SECURITY.md](SECURITY.md).
+
 ## License
 AGPL-3.0-or-later — free forever, no paid editions ([ADR-006](docs/07%20-%20ADR/ADR-006%20Free%20and%20Open%20Source%20Licensing.md)).
-Add the full license text as `LICENSE` from <https://www.gnu.org/licenses/agpl-3.0.txt> before publishing.

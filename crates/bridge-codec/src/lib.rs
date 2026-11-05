@@ -111,7 +111,15 @@ fn region_changed(prev: &[u8], cur: &[u8], stride: usize, x0: usize, y0: usize, 
     })
 }
 
-fn encode_rect(bgra: &[u8], stride: usize, x: usize, y: usize, w: usize, h: usize, quality: u8) -> Result<Vec<u8>, CodecError> {
+fn encode_rect(
+    bgra: &[u8],
+    stride: usize,
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+    quality: u8,
+) -> Result<Vec<u8>, CodecError> {
     let mut rect = Vec::with_capacity(w * h * 4);
     for row in y..y + h {
         let s = row * stride + x * 4;
@@ -175,10 +183,8 @@ impl FrameDecoder {
             return Err(CodecError::TileOutOfBounds);
         }
         let (tw, th) = (t.width as usize, t.height as usize);
-        let opts = DecoderOptions::default()
-            .jpeg_set_out_colorspace(ColorSpace::RGB)
-            .set_max_width(tw)
-            .set_max_height(th);
+        let opts =
+            DecoderOptions::default().jpeg_set_out_colorspace(ColorSpace::RGB).set_max_width(tw).set_max_height(th);
         let mut dec = zune_jpeg::JpegDecoder::new_with_options(&t.jpeg, opts);
         let rgb = dec.decode().map_err(|e| CodecError::Decode(format!("{e:?}")))?;
         let (dw, dh) = dec.dimensions().ok_or_else(|| CodecError::Decode("no dimensions".into()))?;
@@ -250,7 +256,11 @@ mod tests {
 
     #[test]
     fn decoder_rejects_garbage_and_huge_frames() {
-        let bad = FrameUpdate { width: 10, height: 10, tiles: vec![Tile { x: 0, y: 0, width: 10, height: 10, jpeg: vec![0xFF, 0xD8, 1, 2, 3] }] };
+        let bad = FrameUpdate {
+            width: 10,
+            height: 10,
+            tiles: vec![Tile { x: 0, y: 0, width: 10, height: 10, jpeg: vec![0xFF, 0xD8, 1, 2, 3] }],
+        };
         assert!(FrameDecoder::new().apply(&bad).is_err());
         let huge = FrameUpdate { width: 100_000, height: 10, tiles: vec![] };
         assert!(FrameDecoder::new().apply(&huge).is_err());

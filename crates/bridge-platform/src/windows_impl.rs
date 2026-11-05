@@ -22,8 +22,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     DrawIconEx, FindWindowW, GetCursorInfo, GetIconInfo, GetSystemMetrics, MessageBoxW, PostMessageW, CURSORINFO,
-    CURSOR_SHOWING, DI_NORMAL, HICON, ICONINFO, IDNO, IDYES, MB_DEFBUTTON3, MB_ICONINFORMATION, MB_ICONWARNING,
-    MB_OK, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNOCANCEL, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    CURSOR_SHOWING, DI_NORMAL, HICON, ICONINFO, IDNO, IDYES, MB_DEFBUTTON3, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK,
+    MB_SETFOREGROUND, MB_TOPMOST, MB_YESNOCANCEL, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
     SM_YVIRTUALSCREEN, WM_CLOSE,
 };
 
@@ -169,7 +169,17 @@ unsafe fn draw_cursor(dc: HDC, origin_x: i32, origin_y: i32) {
             let _ = DeleteObject(info.hbmColor);
         }
     }
-    let _ = DrawIconEx(dc, ci.ptScreenPos.x - origin_x - hx, ci.ptScreenPos.y - origin_y - hy, icon, 0, 0, 0, None, DI_NORMAL);
+    let _ = DrawIconEx(
+        dc,
+        ci.ptScreenPos.x - origin_x - hx,
+        ci.ptScreenPos.y - origin_y - hy,
+        icon,
+        0,
+        0,
+        0,
+        None,
+        DI_NORMAL,
+    );
 }
 
 /// Inject one input event. Coordinates are clamped to the virtual screen.
@@ -219,7 +229,13 @@ pub fn inject(ev: InputEvent) -> Result<()> {
             INPUT {
                 r#type: INPUT_KEYBOARD,
                 Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT { wVk: VIRTUAL_KEY(0), wScan: (scancode & 0xFF) as u16, dwFlags: flags, time: 0, dwExtraInfo: 0 },
+                    ki: KEYBDINPUT {
+                        wVk: VIRTUAL_KEY(0),
+                        wScan: (scancode & 0xFF) as u16,
+                        dwFlags: flags,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
                 },
             }
         }
@@ -282,7 +298,12 @@ pub fn ask_consent(viewer_fingerprint: &str, remote_addr: &str) -> Consent {
 pub fn session_indicator(title: &str, text: &str) {
     // SAFETY: HSTRINGs live across the call.
     unsafe {
-        MessageBoxW(HWND::default(), &HSTRING::from(text), &HSTRING::from(title), MB_OK | MB_ICONINFORMATION | MB_TOPMOST);
+        MessageBoxW(
+            HWND::default(),
+            &HSTRING::from(text),
+            &HSTRING::from(title),
+            MB_OK | MB_ICONINFORMATION | MB_TOPMOST,
+        );
     }
 }
 

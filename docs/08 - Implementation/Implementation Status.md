@@ -63,10 +63,27 @@ M-01 key pinning · M-02 channel-bound PAKE · M-04 key-bound IDs · M-31 no off
 | Flutter UI | Console + winit window | [[ADR-004 UI Framework]] still open |
 | Rust edition 2024 | 2021 | Lower risk for FFI code; revisit later |
 
+## Repository & pipeline (2026-11-05)
+Public repository: <https://github.com/valerchikforever/rtdesk>
+
+| Item | Where | Status |
+|---|---|---|
+| Licence (AGPL-3.0 full text) | `LICENSE` | ✅ |
+| Vulnerability disclosure policy | `SECURITY.md` (GitHub private advisories, fix SLAs) | ✅ |
+| Contribution rules, DCO sign-off | `CONTRIBUTING.md`, PR template with security checklist | ✅ |
+| CI: fmt, clippy (`-D warnings`), tests, release build on Windows; libs + servers on Linux | `.github/workflows/ci.yml` | ✅ |
+| Dependency policy: licences, advisories, sources | `deny.toml` + cargo-deny job | ✅ passes locally |
+| Fuzzing: `relay_parse`, `session_admit`, `frame_decode`, `rendezvous_decode` (60 s each in CI) | `fuzz/` | ✅ |
+| Release: tag `v*` → Windows + Linux binaries, SHA256SUMS, SLSA build provenance, **draft** release | `.github/workflows/release.yml` | ✅ |
+| Dependency updates | `.github/dependabot.yml` (cargo + actions) | ✅ |
+| Code signing | SignPath Foundation | ⏳ apply |
+
+Dependency hygiene decision: winit is built without `wayland-csd-adwaita`, which pulled the unmaintained `ttf-parser` (RUSTSEC-2026-0192).
+
 ## Next steps (Phase 1 completion → Beta)
-1. Fuzz targets (`cargo-fuzz`) for framing, relay parser, codec decoder, session admit.
-2. DXGI Desktop Duplication capture; monitor selection; adaptive quality.
-3. Windows service + Winlogon agent (UAC, lock screen), privilege-separated IPC.
-4. Installer (MSI) with code signing via SignPath Foundation (free for OSS).
-5. GUI per ADR-004; unattended access with OPAQUE.
-6. CI pipeline per [[CI-CD and Release]].
+1. Repository settings (owner): enable private vulnerability reporting, branch protection on `main` (required CI checks, reviews), Dependabot alerts.
+2. Pin GitHub Actions to commit SHAs (supply-chain hardening, SR-14).
+3. DXGI Desktop Duplication capture; monitor selection; adaptive quality.
+4. Windows service + Winlogon agent (UAC, lock screen), privilege-separated IPC.
+5. Installer (MSI) with code signing via SignPath Foundation (free for OSS).
+6. GUI per ADR-004; unattended access with OPAQUE.

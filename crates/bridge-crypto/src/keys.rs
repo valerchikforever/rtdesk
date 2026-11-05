@@ -73,11 +73,7 @@ pub fn decode_public(s: &str) -> Option<PublicKey> {
 pub fn fingerprint(key: &PublicKey) -> String {
     let digest = Sha256::digest(key);
     let b32 = crockford_base32(&digest[..10]);
-    b32.as_bytes()
-        .chunks(4)
-        .map(|c| std::str::from_utf8(c).unwrap_or("????"))
-        .collect::<Vec<_>>()
-        .join("-")
+    b32.as_bytes().chunks(4).map(|c| std::str::from_utf8(c).unwrap_or("????")).collect::<Vec<_>>().join("-")
 }
 
 fn crockford_base32(data: &[u8]) -> String {

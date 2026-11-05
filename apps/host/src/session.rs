@@ -12,7 +12,9 @@ use bridge_net::endpoint::{channel_binding, peer_key};
 use bridge_platform::{Consent, InputEvent};
 use bridge_proto::framing::{read_msg, write_msg, MAX_CLIPBOARD_TEXT, MAX_CONTROL};
 use bridge_proto::msg::control::Kind;
-use bridge_proto::msg::{Bye, ClipboardText, Control, FrameUpdate, PakeConfirm, PakeMsg, SessionDenied, SessionGranted};
+use bridge_proto::msg::{
+    Bye, ClipboardText, Control, FrameUpdate, PakeConfirm, PakeMsg, SessionDenied, SessionGranted,
+};
 use bridge_session::{FailureOutcome, HostSession, Permissions};
 use quinn::{Connection, RecvStream, SendStream};
 use tokio::sync::{mpsc, oneshot, Mutex, OwnedSemaphorePermit};
@@ -62,7 +64,8 @@ pub async fn run(ctx: Arc<HostCtx>, conn: Connection, permit: OwnedSemaphorePerm
         .context("viewer did not open a control stream")??;
     let mut sm = HostSession::new();
 
-    let auth = tokio::time::timeout(AUTH_TIMEOUT, authenticate(&ctx, &conn, &mut sm, &mut send, &mut recv, viewer_pub)).await;
+    let auth =
+        tokio::time::timeout(AUTH_TIMEOUT, authenticate(&ctx, &conn, &mut sm, &mut send, &mut recv, viewer_pub)).await;
     drop(permit);
     match auth {
         Err(_) => {
@@ -156,7 +159,13 @@ async fn authenticate(
     Ok(())
 }
 
-async fn active(conn: Connection, send: SendStream, mut recv: RecvStream, mut sm: HostSession, fingerprint: &str) -> Result<()> {
+async fn active(
+    conn: Connection,
+    send: SendStream,
+    mut recv: RecvStream,
+    mut sm: HostSession,
+    fingerprint: &str,
+) -> Result<()> {
     let perms = sm.permissions();
     let send: SharedSend = Arc::new(Mutex::new(send));
     let stop = Arc::new(AtomicBool::new(false));
@@ -192,7 +201,8 @@ async fn active(conn: Connection, send: SendStream, mut recv: RecvStream, mut sm
     }
 
     let last_clip = Arc::new(std::sync::Mutex::new(read_clipboard().unwrap_or_default()));
-    let clip_task = perms.contains(Permissions::CLIPBOARD).then(|| tokio::spawn(clipboard_watch(send.clone(), last_clip.clone())));
+    let clip_task =
+        perms.contains(Permissions::CLIPBOARD).then(|| tokio::spawn(clipboard_watch(send.clone(), last_clip.clone())));
 
     let reason = loop {
         tokio::select! {
@@ -242,7 +252,11 @@ async fn active(conn: Connection, send: SendStream, mut recv: RecvStream, mut sm
 }
 
 fn describe(p: Permissions) -> &'static str {
-    if p.contains(Permissions::CONTROL) { "full control (mouse, keyboard, clipboard)" } else { "view only" }
+    if p.contains(Permissions::CONTROL) {
+        "full control (mouse, keyboard, clipboard)"
+    } else {
+        "view only"
+    }
 }
 
 fn inject(ev: InputEvent) {

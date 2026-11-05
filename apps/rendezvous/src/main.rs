@@ -182,7 +182,12 @@ fn valid_device_id(id: &str) -> bool {
     id.len() == 9 && id.bytes().all(|b| b.is_ascii_digit()) && !id.starts_with('0')
 }
 
-async fn handle_register(state: Arc<State>, conn: Connection, mut send: SendStream, mut recv: RecvStream) -> Result<()> {
+async fn handle_register(
+    state: Arc<State>,
+    conn: Connection,
+    mut send: SendStream,
+    mut recv: RecvStream,
+) -> Result<()> {
     let observed = conn.remote_address();
     if !state.allow(observed.ip(), Kind::Register) {
         return fail(&mut send, "rate limited").await;
@@ -283,11 +288,14 @@ async fn handle_lookup(state: Arc<State>, conn: Connection, mut send: SendStream
         return fail(&mut send, "invalid device id").await;
     }
     let host_key: Option<PublicKey> = state.registry.lock().ok().and_then(|r| r.key_of(device_id));
-    let online = state.online.lock().ok().and_then(|o| {
-        o.get(device_id).map(|h| (h.tx.clone(), h.observed, h.local_addrs.clone()))
-    });
+    let online = state
+        .online
+        .lock()
+        .ok()
+        .and_then(|o| o.get(device_id).map(|h| (h.tx.clone(), h.observed, h.local_addrs.clone())));
     let (Some(host_key), Some((tx, host_observed, host_local))) = (host_key, online) else {
-        respond(&mut send, rv_response::Kind::LookupResult(LookupResult { found: false, ..Default::default() })).await?;
+        respond(&mut send, rv_response::Kind::LookupResult(LookupResult { found: false, ..Default::default() }))
+            .await?;
         let _ = send.finish();
         return Ok(());
     };

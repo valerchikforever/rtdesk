@@ -68,7 +68,11 @@ pub fn parse(buf: &[u8]) -> Option<Packet<'_>> {
 }
 
 pub fn other_role(role: u8) -> u8 {
-    if role == ROLE_HOST { ROLE_VIEWER } else { ROLE_HOST }
+    if role == ROLE_HOST {
+        ROLE_VIEWER
+    } else {
+        ROLE_HOST
+    }
 }
 
 #[cfg(test)]

@@ -45,9 +45,9 @@ pub fn write_private(path: &Path, data: &[u8]) -> Result<()> {
 
 #[cfg(windows)]
 pub fn protect(data: &[u8]) -> Result<Vec<u8>> {
+    use windows::core::PCWSTR;
     use windows::Win32::Foundation::{LocalFree, HLOCAL};
     use windows::Win32::Security::Cryptography::{CryptProtectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB};
-    use windows::core::PCWSTR;
 
     let len = u32::try_from(data.len()).map_err(|_| CryptoError::Storage("secret too large".into()))?;
     let input = CRYPT_INTEGER_BLOB { cbData: len, pbData: data.as_ptr() as *mut u8 };

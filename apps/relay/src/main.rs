@@ -41,10 +41,18 @@ struct Session {
 
 impl Session {
     fn slot(&mut self, role: u8) -> &mut Option<SocketAddr> {
-        if role == ROLE_HOST { &mut self.host } else { &mut self.viewer }
+        if role == ROLE_HOST {
+            &mut self.host
+        } else {
+            &mut self.viewer
+        }
     }
     fn addr(&self, role: u8) -> Option<SocketAddr> {
-        if role == ROLE_HOST { self.host } else { self.viewer }
+        if role == ROLE_HOST {
+            self.host
+        } else {
+            self.viewer
+        }
     }
 }
 
@@ -107,7 +115,10 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let secret: [u8; 32] = std::fs::read(&args.secret_file)
         .with_context(|| {
-            format!("reading {} — start bridge-rendezvous first (it creates the secret) or copy it here", args.secret_file.display())
+            format!(
+                "reading {} — start bridge-rendezvous first (it creates the secret) or copy it here",
+                args.secret_file.display()
+            )
         })?
         .as_slice()
         .try_into()

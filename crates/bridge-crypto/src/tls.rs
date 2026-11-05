@@ -38,8 +38,8 @@ pub fn ed25519_key_from_cert(der: &[u8]) -> Option<PublicKey> {
 /// Self-signed certificate wrapping the device key.
 pub fn self_signed(key: &DeviceKey) -> Result<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
     let kp = rcgen::KeyPair::try_from(key.pkcs8()).map_err(|e| CryptoError::Cert(e.to_string()))?;
-    let params = rcgen::CertificateParams::new(vec!["bridge.peer".to_string()])
-        .map_err(|e| CryptoError::Cert(e.to_string()))?;
+    let params =
+        rcgen::CertificateParams::new(vec!["bridge.peer".to_string()]).map_err(|e| CryptoError::Cert(e.to_string()))?;
     let cert = params.self_signed(&kp).map_err(|e| CryptoError::Cert(e.to_string()))?;
     let der = cert.der().clone();
     let key_der = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key.pkcs8().to_vec()));
@@ -73,8 +73,12 @@ impl ServerCertVerifier for PinnedServerVerifier {
         let key = ed25519_key_from_cert(end_entity)
             .ok_or(rustls::Error::InvalidCertificate(CertificateError::BadEncoding))?;
         match self.policy {
-            ServerKeyPolicy::Pinned(expected) if bool::from(key.ct_eq(&expected)) => Ok(ServerCertVerified::assertion()),
-            ServerKeyPolicy::Pinned(_) => Err(rustls::Error::InvalidCertificate(CertificateError::ApplicationVerificationFailure)),
+            ServerKeyPolicy::Pinned(expected) if bool::from(key.ct_eq(&expected)) => {
+                Ok(ServerCertVerified::assertion())
+            }
+            ServerKeyPolicy::Pinned(_) => {
+                Err(rustls::Error::InvalidCertificate(CertificateError::ApplicationVerificationFailure))
+            }
             ServerKeyPolicy::TrustOnFirstUse => Ok(ServerCertVerified::assertion()),
         }
     }
@@ -160,8 +164,8 @@ pub fn server_config(key: &DeviceKey, alpn: &[u8], require_client_key: bool) -> 
     let provider = provider();
     let algs = provider.signature_verification_algorithms;
     let (cert, key_der) = self_signed(key)?;
-    let builder = rustls::ServerConfig::builder_with_provider(provider)
-        .with_protocol_versions(&[&rustls::version::TLS13])?;
+    let builder =
+        rustls::ServerConfig::builder_with_provider(provider).with_protocol_versions(&[&rustls::version::TLS13])?;
     let mut cfg = if require_client_key {
         builder
             .with_client_cert_verifier(Arc::new(Ed25519ClientVerifier { algs }))
@@ -174,7 +178,11 @@ pub fn server_config(key: &DeviceKey, alpn: &[u8], require_client_key: bool) -> 
     Ok(cfg)
 }
 
-pub fn client_config(client_key: Option<&DeviceKey>, policy: ServerKeyPolicy, alpn: &[u8]) -> Result<rustls::ClientConfig> {
+pub fn client_config(
+    client_key: Option<&DeviceKey>,
+    policy: ServerKeyPolicy,
+    alpn: &[u8],
+) -> Result<rustls::ClientConfig> {
     let provider = provider();
     let algs = provider.signature_verification_algorithms;
     let builder = rustls::ClientConfig::builder_with_provider(provider)

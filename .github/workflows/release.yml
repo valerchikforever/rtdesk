@@ -1,0 +1,88 @@
+name: Release
+
+# Push a tag like v0.1.0 to build binaries and create a DRAFT release.
+# A maintainer reviews the draft (checksums, notes) before publishing it.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write      # build provenance (SLSA) attestation
+      attestations: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            packages: -p bridge-host -p bridge-viewer -p bridge-rendezvous -p bridge-relay
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            packages: -p bridge-rendezvous -p bridge-relay
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Build (no cache: release builds start clean)
+        run: cargo build --release --locked ${{ matrix.packages }}
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "bridge-${{ github.ref_name }}-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force "pkg/$name", dist | Out-Null
+          Copy-Item target/release/bridge-*.exe, LICENSE, README.md, SECURITY.md "pkg/$name/"
+          Compress-Archive -Path "pkg/$name/*" -DestinationPath "dist/$name.zip"
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          name="bridge-${{ github.ref_name }}-${{ matrix.target }}"
+          mkdir -p "pkg/$name" dist
+          cp target/release/bridge-rendezvous target/release/bridge-relay LICENSE README.md SECURITY.md "pkg/$name/"
+          tar -C pkg -czf "dist/$name.tar.gz" "$name"
+      - uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+
+  release:
+    name: Draft GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: dist/*
+          body: |
+            Bridge is free and open-source software (AGPL-3.0).
+
+            **Verify your download:** compare with `SHA256SUMS`, and check build provenance with
+            `gh attestation verify <file> --repo ${{ github.repository }}`.
+
+            Windows binaries are not yet code-signed (planned via SignPath Foundation), so SmartScreen may warn.

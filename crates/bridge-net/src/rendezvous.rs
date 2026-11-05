@@ -22,10 +22,7 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 /// Connect to the configured rendezvous server, enforcing its pinned key
 /// (explicit `server_key`, else known_servers.json, else trust-on-first-use + pin).
 pub async fn connect(endpoint: &Endpoint, dir: &Path, cfg: &ClientConfig) -> Result<Connection> {
-    let server = cfg
-        .server
-        .as_deref()
-        .context("no rendezvous server configured — pass --server <host[:port]>")?;
+    let server = cfg.server.as_deref().context("no rendezvous server configured — pass --server <host[:port]>")?;
     let server = crate::config::with_default_port(server, DEFAULT_PORT_RENDEZVOUS);
     let addr = resolve(&server).await?;
     let mut known = KnownKeys::load(dir.join("known_servers.json"))?;

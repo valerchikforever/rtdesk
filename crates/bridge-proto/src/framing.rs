@@ -56,7 +56,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::msg::{Bye, Control, control::Kind};
+    use crate::msg::{control::Kind, Bye, Control};
 
     #[tokio::test]
     async fn roundtrip_and_limit() {

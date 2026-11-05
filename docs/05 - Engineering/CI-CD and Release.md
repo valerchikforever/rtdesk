@@ -6,6 +6,9 @@ updated: 2026-11-05
 
 # CI/CD and Release
 
+> [!info] Implemented (MVP)
+> `ci.yml` (fmt, clippy, tests, cargo-deny, 60 s fuzzing per target) and `release.yml` (tag → binaries, SHA256SUMS, SLSA provenance attestation, draft release). TUF updates, reproducibility check and HSM signing are still planned. See [[Implementation Status#Repository & pipeline (2026-11-05)]].
+
 ## CI pipeline (every PR)
 1. Format, clippy, unit tests (Win/mac/Linux runners).
 2. `cargo deny`, `cargo audit`, `cargo vet`, gitleaks, CodeQL/Semgrep.

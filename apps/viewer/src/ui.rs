@@ -9,12 +9,12 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bridge_codec::FrameDecoder;
+use bridge_proto::button;
 use bridge_proto::framing::{read_msg, write_msg, MAX_CLIPBOARD_TEXT, MAX_CONTROL, MAX_FRAME};
 use bridge_proto::msg::control::Kind;
 use bridge_proto::msg::{
     Bye, ClipboardText, Control, FrameUpdate, KeyEvent, MouseButton as MouseButtonMsg, MouseMove, MouseWheel,
 };
-use bridge_proto::button;
 use bridge_session::Permissions;
 use tokio::sync::mpsc;
 use tracing::warn;
@@ -94,7 +94,8 @@ pub fn run(rt: &tokio::runtime::Runtime, session: Session, device_id: &str) -> R
         rt.spawn(clipboard_task(input_tx.clone(), last_clip.clone()));
     }
 
-    let formatted: String = device_id.as_bytes().chunks(3).map(|c| String::from_utf8_lossy(c).into_owned()).collect::<Vec<_>>().join(" ");
+    let formatted: String =
+        device_id.as_bytes().chunks(3).map(|c| String::from_utf8_lossy(c).into_owned()).collect::<Vec<_>>().join(" ");
     let mut app = App {
         title: format!("Bridge — {formatted} — {}", if control { "full control" } else { "view only" }),
         window: None,
@@ -165,7 +166,10 @@ async fn reader_task(mut recv: quinn::RecvStream, last_clip: Arc<Mutex<String>>,
         match msg.kind {
             Some(Kind::Clipboard(c)) if c.text.len() <= MAX_CLIPBOARD_TEXT => {
                 *last_clip.lock().unwrap_or_else(|e| e.into_inner()) = c.text.clone();
-                let _ = tokio::task::spawn_blocking(move || arboard::Clipboard::new().and_then(|mut cb| cb.set_text(c.text))).await;
+                let _ = tokio::task::spawn_blocking(move || {
+                    arboard::Clipboard::new().and_then(|mut cb| cb.set_text(c.text))
+                })
+                .await;
             }
             Some(Kind::Bye(b)) => break b.reason,
             Some(other) => warn!("ignoring unexpected {} from host", other.name()),
@@ -271,7 +275,8 @@ impl ApplicationHandler<UserEvent> for App {
         if self.window.is_some() {
             return;
         }
-        let attrs = Window::default_attributes().with_title(&self.title).with_inner_size(LogicalSize::new(1280.0, 760.0));
+        let attrs =
+            Window::default_attributes().with_title(&self.title).with_inner_size(LogicalSize::new(1280.0, 760.0));
         let window = match event_loop.create_window(attrs) {
             Ok(w) => Rc::new(w),
             Err(e) => {

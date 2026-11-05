@@ -175,7 +175,12 @@ async fn registration_loop(endpoint: quinn::Endpoint, dir: PathBuf, mut cfg: Cli
     }
 }
 
-async fn register_once(endpoint: &quinn::Endpoint, dir: &std::path::Path, cfg: &mut ClientConfig, ctx: &Arc<HostCtx>) -> Result<()> {
+async fn register_once(
+    endpoint: &quinn::Endpoint,
+    dir: &std::path::Path,
+    cfg: &mut ClientConfig,
+    ctx: &Arc<HostCtx>,
+) -> Result<()> {
     let conn = rendezvous::connect(endpoint, dir, cfg).await?;
     let port = endpoint.local_addr()?.port();
     let local_addrs = local_ip_toward(conn.remote_address())
