@@ -27,8 +27,16 @@ fuzz_target!(|data: &[u8]| {
         let ok = s.admit(&kind).is_ok();
 
         if ok {
-            let is_input =
-                matches!(kind, Kind::MouseMove(_) | Kind::MouseButton(_) | Kind::MouseWheel(_) | Kind::Key(_));
+            let is_input = matches!(
+                kind,
+                Kind::MouseMove(_)
+                    | Kind::MouseMoveRelative(_)
+                    | Kind::MouseButton(_)
+                    | Kind::MouseWheel(_)
+                    | Kind::Key(_)
+                    | Kind::Gamepad(_)
+            );
+            assert!(!matches!(kind, Kind::CursorState(_)), "host-only message admitted");
             if is_input {
                 assert_eq!(before, Phase::Active);
                 assert!(perms.contains(Permissions::CONTROL));

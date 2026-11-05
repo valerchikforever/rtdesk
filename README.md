@@ -58,6 +58,15 @@ bridge-viewer 123456789 --server YOUR_SERVER --server-key SERVER_KEY
 ```
 Enter the code, wait for the host user to accept. Close the window to disconnect.
 
+### Games and 3D applications
+- **Relative mouse:** when a game or 3D viewport hides the cursor, the viewer locks your mouse and sends raw
+  movement, so mouse-look and orbiting work. **Ctrl+Alt+M** toggles it manually and always releases the mouse;
+  switching windows releases it too. Disable auto mode with `--no-auto-relative`.
+- **Gamepads:** up to 4 controllers are forwarded while the viewer window has focus and appear on the remote
+  computer as Xbox 360 controllers. The **remote computer needs the ViGEmBus driver**
+  (<https://github.com/nefarius/ViGEmBus/releases>, signed; note the project is end-of-life).
+  Bridge never installs drivers itself. Disable with `--no-gamepad`.
+
 Without `--server-key` the server key is pinned on first use (a warning shows the fingerprint to compare).
 
 ### Docker (servers)
@@ -74,6 +83,7 @@ docker run -d --name bridge-relay -p 21117:21117/udp -v bridge-data:/data bridge
 ## Known MVP limitations
 - Windows only for host and viewer; macOS/Linux/mobile come in the Beta phase.
 - Portable/attended mode: no unattended access, no control of UAC prompts or elevated windows yet.
+  Games running as administrator or with anti-cheat may ignore injected input.
 - Codec: JPEG dirty-tiles (patent-free, CPU); hardware H.264/HEVC/AV1 is planned.
 - Console UI; the graphical UI (Flutter, ADR-004) is planned.
 - IPv4 only.

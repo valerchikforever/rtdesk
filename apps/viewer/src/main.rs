@@ -1,6 +1,7 @@
 //! bridge-viewer — connect to a host by Device ID + one-time code.
 
 mod connect;
+mod gamepad;
 mod ui;
 
 use std::path::PathBuf;
@@ -26,6 +27,13 @@ pub struct Args {
     /// Accept a CHANGED host key. Only after verifying the new fingerprint with the remote user!
     #[arg(long)]
     pub accept_new_host_key: bool,
+    /// Do not switch to relative mouse mode automatically when the remote cursor is hidden
+    /// (Ctrl+Alt+M still toggles it manually).
+    #[arg(long)]
+    pub no_auto_relative: bool,
+    /// Do not forward local gamepads to the remote computer.
+    #[arg(long)]
+    pub no_gamepad: bool,
 }
 
 fn main() -> Result<()> {
@@ -45,7 +53,8 @@ fn main() -> Result<()> {
             std::process::exit(1);
         }
     };
-    let result = ui::run(&rt, session, &device_id);
+    let opts = ui::UiOptions { auto_relative: !args.no_auto_relative, gamepad: !args.no_gamepad };
+    let result = ui::run(&rt, session, &device_id, opts);
     rt.shutdown_timeout(std::time::Duration::from_secs(1));
     result
 }

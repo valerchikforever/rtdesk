@@ -30,6 +30,8 @@ IDs: `FR-*` functional, `NFR-*` non-functional, `SR-*` security (security requir
 | FR-17 | Self-hosted servers with zero dependency on our cloud | MVP |
 | FR-18 | Web viewer (WebTransport/WebCodecs) | v1.x |
 | FR-19 | Audio, remote terminal, Android host | v1.x |
+| FR-20 | Gamepad forwarding (up to 4 pads, XInput layout, virtual pads on host) | MVP+ |
+| FR-21 | Relative mouse / pointer lock for games and 3D apps (auto when remote cursor hidden, Ctrl+Alt+M) | MVP+ |
 
 ## Non-functional requirements
 | ID | Requirement |

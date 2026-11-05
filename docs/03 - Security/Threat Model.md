@@ -88,6 +88,9 @@ TB1 Internet ↔ host agent · TB2 host agent ↔ privileged service (IPC) · TB
 | T-53 | Malicious host exploits viewer decoder | 3×5 | Sandboxed decoder process |
 | T-54 | Installer/updater EoP (writable temp dirs, TOCTOU) | 3×5 | Updates staged in SYSTEM-only dir, verify-then-execute from protected path, no `%TEMP%` execution |
 | T-55 | Session continues on secure desktop after viewer should lose access | 2×5 | Single session authority in service; terminating the session kills Winlogon agent too |
+| T-56 | Virtual input devices (gamepads) outlive the session and keep being controllable | 2×4 | Pads owned by a session-scoped thread; dropped (unplugged) at session end; never created without CONTROL |
+| T-57 | Stuck inputs (key, button, stick) after focus loss or disconnect | 3×3 | Viewer releases keys and sends neutral pad state on focus loss; host unplugs pads on disconnect |
+| T-58 | Viewer locks the local mouse and the user cannot get out | 2×2 | Ctrl+Alt+M always releases; focus loss always releases; auto mode can be disabled |
 
 ### Human factors / abuse (beyond STRIDE)
 | ID | Threat | Mitigations |

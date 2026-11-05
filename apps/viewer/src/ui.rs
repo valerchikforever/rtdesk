@@ -1,4 +1,10 @@
 //! Viewer window: winit + softbuffer (CPU blit, fit-to-window). GPU rendering comes with HW decode.
+//!
+//! Mouse modes:
+//! - **absolute** (default): the local cursor position maps 1:1 onto the remote screen.
+//! - **relative** (pointer lock): the local cursor is hidden and locked; raw mouse deltas are sent.
+//!   Needed by games and 3D viewports that hide the cursor and read Raw Input. Turned on
+//!   automatically while the remote cursor is hidden, or manually with Ctrl+Alt+M.
 
 use std::collections::HashSet;
 use std::num::NonZeroU32;
@@ -9,27 +15,35 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bridge_codec::FrameDecoder;
-use bridge_proto::button;
 use bridge_proto::framing::{read_msg, write_msg, MAX_CLIPBOARD_TEXT, MAX_CONTROL, MAX_FRAME};
 use bridge_proto::msg::control::Kind;
 use bridge_proto::msg::{
-    Bye, ClipboardText, Control, FrameUpdate, KeyEvent, MouseButton as MouseButtonMsg, MouseMove, MouseWheel,
+    Bye, ClipboardText, Control, FrameUpdate, KeyEvent, MouseButton as MouseButtonMsg, MouseMove, MouseMoveRelative,
+    MouseWheel,
 };
-use bridge_session::Permissions;
+use bridge_proto::{button, features};
+use bridge_session::{Permissions, MAX_RELATIVE_DELTA};
 use tokio::sync::mpsc;
 use tracing::warn;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
+use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 use winit::platform::scancode::PhysicalKeyExtScancode;
-use winit::window::{Window, WindowId};
+use winit::window::{CursorGrabMode, Window, WindowId};
 
 use crate::connect::Session;
+
+pub struct UiOptions {
+    pub auto_relative: bool,
+    pub gamepad: bool,
+}
 
 #[derive(Debug)]
 enum UserEvent {
     Frame,
+    RemoteCursor(bool),
     Closed(String),
 }
 
@@ -69,8 +83,38 @@ impl Viewport {
     }
 }
 
-pub fn run(rt: &tokio::runtime::Runtime, session: Session, device_id: &str) -> Result<()> {
+/// Decides between absolute and relative mouse mode. Pure, so it can be unit-tested.
+#[derive(Debug, Clone, Copy)]
+struct MouseMode {
+    control: bool,
+    focused: bool,
+    auto: bool,
+    manual: bool,
+    remote_hidden: bool,
+}
+
+impl MouseMode {
+    fn relative(self) -> bool {
+        self.control && self.focused && (self.manual || (self.auto && self.remote_hidden))
+    }
+
+    /// Ctrl+Alt+M: one press always leaves relative mode (auto-switching is disabled for the session
+    /// only if it was what kept the mouse locked); otherwise enters relative mode manually.
+    fn toggle(&mut self) {
+        if self.relative() {
+            self.manual = false;
+            if self.relative() {
+                self.auto = false;
+            }
+        } else {
+            self.manual = true;
+        }
+    }
+}
+
+pub fn run(rt: &tokio::runtime::Runtime, session: Session, device_id: &str, opts: UiOptions) -> Result<()> {
     let perms = Permissions::sanitize(session.granted.permissions);
+    let host_features = session.granted.features;
     let control = perms.contains(Permissions::CONTROL);
     println!(
         "Connected ({}). Access: {}. Close the window to disconnect.",
@@ -83,6 +127,8 @@ pub fn run(rt: &tokio::runtime::Runtime, session: Session, device_id: &str) -> R
     let shared = Arc::new(Shared { frame: Mutex::new(FrameSlot::default()), pending: AtomicBool::new(false) });
     let (input_tx, input_rx) = mpsc::channel::<Kind>(1024);
     let last_clip = Arc::new(Mutex::new(String::new()));
+    let focused = Arc::new(AtomicBool::new(false));
+    let stop = Arc::new(AtomicBool::new(false));
 
     let Session { conn, send, recv, granted: _, _relay, _endpoint, path: _ } = session;
     let _guard = rt.enter();
@@ -92,6 +138,24 @@ pub fn run(rt: &tokio::runtime::Runtime, session: Session, device_id: &str) -> R
     if perms.contains(Permissions::CLIPBOARD) {
         *last_clip.lock().unwrap_or_else(|e| e.into_inner()) = read_clipboard().unwrap_or_default();
         rt.spawn(clipboard_task(input_tx.clone(), last_clip.clone()));
+    }
+
+    if control {
+        if host_features & features::RELATIVE_MOUSE != 0 {
+            println!(
+                "Mouse: Ctrl+Alt+M toggles relative mode (games / 3D apps). Auto mode: {}.",
+                on_off(opts.auto_relative)
+            );
+        }
+        match (opts.gamepad, host_features & features::GAMEPAD != 0) {
+            (true, true) => {
+                println!("Gamepads: forwarded to the remote computer while this window has focus.");
+                let (tx, f, s) = (input_tx.clone(), focused.clone(), stop.clone());
+                std::thread::Builder::new().name("gamepads".into()).spawn(move || crate::gamepad::run(tx, f, s))?;
+            }
+            (true, false) => println!("Gamepads: not available — the remote computer needs the ViGEmBus driver."),
+            (false, _) => {}
+        }
     }
 
     let formatted: String =
@@ -104,12 +168,24 @@ pub fn run(rt: &tokio::runtime::Runtime, session: Session, device_id: &str) -> R
         shared,
         view: Viewport::default(),
         input: input_tx,
-        control,
         pressed: HashSet::new(),
         last_pos: None,
         closed: None,
+        mode: MouseMode {
+            control: control && host_features & features::RELATIVE_MOUSE != 0,
+            focused: false,
+            auto: opts.auto_relative,
+            manual: false,
+            remote_hidden: false,
+        },
+        control,
+        relative_active: false,
+        rel_acc: (0.0, 0.0),
+        modifiers: ModifiersState::empty(),
+        focused,
     };
     event_loop.run_app(&mut app)?;
+    stop.store(true, Ordering::Relaxed);
     conn.close(0u32.into(), b"bye");
     // keep relay/endpoint alive until here
     drop((_relay, _endpoint));
@@ -117,6 +193,14 @@ pub fn run(rt: &tokio::runtime::Runtime, session: Session, device_id: &str) -> R
         println!("Session ended: {reason}");
     }
     Ok(())
+}
+
+fn on_off(b: bool) -> &'static str {
+    if b {
+        "on"
+    } else {
+        "off"
+    }
 }
 
 async fn video_task(conn: quinn::Connection, shared: Arc<Shared>, proxy: EventLoopProxy<UserEvent>) {
@@ -171,6 +255,9 @@ async fn reader_task(mut recv: quinn::RecvStream, last_clip: Arc<Mutex<String>>,
                 })
                 .await;
             }
+            Some(Kind::CursorState(c)) => {
+                let _ = proxy.send_event(UserEvent::RemoteCursor(c.visible));
+            }
             Some(Kind::Bye(b)) => break b.reason,
             Some(other) => warn!("ignoring unexpected {} from host", other.name()),
             None => {}
@@ -216,6 +303,13 @@ struct App {
     pressed: HashSet<u32>,
     last_pos: Option<(i32, i32)>,
     closed: Option<String>,
+    mode: MouseMode,
+    relative_active: bool,
+    /// Sub-count remainder of raw mouse deltas.
+    rel_acc: (f64, f64),
+    modifiers: ModifiersState,
+    /// Shared with the gamepad thread.
+    focused: Arc<AtomicBool>,
 }
 
 impl App {
@@ -227,6 +321,30 @@ impl App {
     fn release_all_keys(&mut self) {
         for sc in std::mem::take(&mut self.pressed) {
             self.send(Kind::Key(KeyEvent { scancode: sc, down: false }));
+        }
+    }
+
+    /// Apply the mouse mode to the window (cursor lock + visibility) when it changes.
+    fn sync_mouse_mode(&mut self) {
+        let want = self.mode.relative();
+        if want == self.relative_active {
+            return;
+        }
+        self.relative_active = want;
+        self.rel_acc = (0.0, 0.0);
+        let Some(w) = &self.window else { return };
+        if want {
+            // Locked is not supported everywhere (e.g. Windows) — fall back to confining to the window.
+            if w.set_cursor_grab(CursorGrabMode::Locked).is_err() {
+                let _ = w.set_cursor_grab(CursorGrabMode::Confined);
+            }
+            w.set_cursor_visible(false);
+            w.set_title(&format!("{} — relative mouse (Ctrl+Alt+M to release)", self.title));
+        } else {
+            let _ = w.set_cursor_grab(CursorGrabMode::None);
+            w.set_cursor_visible(true);
+            w.set_title(&self.title);
+            self.last_pos = None;
         }
     }
 
@@ -270,6 +388,19 @@ fn blit(dst: &mut [u32], dw: usize, dh: usize, src: &FrameSlot) -> Viewport {
     Viewport { ox, oy, w: tw, h: th, src_w: sw, src_h: sh }
 }
 
+/// Split accumulated raw deltas into whole counts to send and the remainder to keep.
+fn take_whole_counts(acc: &mut (f64, f64)) -> Option<(i32, i32)> {
+    let max = f64::from(MAX_RELATIVE_DELTA);
+    let dx = acc.0.trunc().clamp(-max, max);
+    let dy = acc.1.trunc().clamp(-max, max);
+    if dx == 0.0 && dy == 0.0 {
+        return None;
+    }
+    acc.0 -= acc.0.trunc();
+    acc.1 -= acc.1.trunc();
+    Some((dx as i32, dy as i32))
+}
+
 impl ApplicationHandler<UserEvent> for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
@@ -305,9 +436,26 @@ impl ApplicationHandler<UserEvent> for App {
                     w.request_redraw();
                 }
             }
+            UserEvent::RemoteCursor(visible) => {
+                self.mode.remote_hidden = !visible;
+                self.sync_mouse_mode();
+            }
             UserEvent::Closed(reason) => {
                 self.closed = Some(reason);
                 event_loop.exit();
+            }
+        }
+    }
+
+    fn device_event(&mut self, _event_loop: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
+        if !self.relative_active {
+            return;
+        }
+        if let DeviceEvent::MouseMotion { delta } = event {
+            self.rel_acc.0 += delta.0;
+            self.rel_acc.1 += delta.1;
+            if let Some((dx, dy)) = take_whole_counts(&mut self.rel_acc) {
+                self.send(Kind::MouseMoveRelative(MouseMoveRelative { dx, dy }));
             }
         }
     }
@@ -326,9 +474,20 @@ impl ApplicationHandler<UserEvent> for App {
                     w.request_redraw();
                 }
             }
-            WindowEvent::Focused(false) => self.release_all_keys(),
+            WindowEvent::Focused(f) => {
+                if !f {
+                    self.release_all_keys();
+                }
+                self.focused.store(f, Ordering::Relaxed);
+                self.mode.focused = f;
+                self.sync_mouse_mode();
+            }
+            WindowEvent::ModifiersChanged(m) => self.modifiers = m.state(),
             _ if !self.control => {}
             WindowEvent::CursorMoved { position, .. } => {
+                if self.relative_active {
+                    return; // raw deltas are sent from device_event instead
+                }
                 if let Some(p) = self.view.to_remote(position.x, position.y) {
                     if self.last_pos != Some(p) {
                         self.last_pos = Some(p);
@@ -355,11 +514,23 @@ impl ApplicationHandler<UserEvent> for App {
                 }
             }
             WindowEvent::KeyboardInput { event, is_synthetic: false, .. } => {
+                let down = event.state == ElementState::Pressed;
+                // Local hotkey, not forwarded: Ctrl+Alt+M toggles relative mouse mode.
+                if event.physical_key == PhysicalKey::Code(KeyCode::KeyM)
+                    && self.modifiers.control_key()
+                    && self.modifiers.alt_key()
+                {
+                    if down && !event.repeat && self.mode.control {
+                        self.mode.toggle();
+                        self.sync_mouse_mode();
+                        println!("Relative mouse: {}", on_off(self.relative_active));
+                    }
+                    return;
+                }
                 let Some(sc) = event.physical_key.to_scancode() else { return };
                 if sc == 0 {
                     return;
                 }
-                let down = event.state == ElementState::Pressed;
                 if down {
                     self.pressed.insert(sc);
                 } else {
@@ -387,5 +558,60 @@ mod tests {
         assert_eq!(v.to_remote(0.0, 50.0), None);
         assert_eq!(v.to_remote(399.0, 299.0), Some((199, 99)));
         assert_eq!(v.to_remote(200.0, 200.0), Some((100, 50)));
+    }
+
+    fn mode() -> MouseMode {
+        MouseMode { control: true, focused: true, auto: true, manual: false, remote_hidden: false }
+    }
+
+    #[test]
+    fn auto_relative_follows_remote_cursor() {
+        let mut m = mode();
+        assert!(!m.relative());
+        m.remote_hidden = true;
+        assert!(m.relative(), "game hid the cursor");
+        m.focused = false;
+        assert!(!m.relative(), "focus loss always releases the mouse");
+    }
+
+    #[test]
+    fn hotkey_toggles_and_can_opt_out_of_auto() {
+        let mut m = mode();
+        m.toggle();
+        assert!(m.relative(), "manual on");
+        m.toggle();
+        assert!(!m.relative(), "manual off");
+        m.remote_hidden = true;
+        assert!(m.relative(), "auto engaged");
+        m.toggle();
+        assert!(!m.relative(), "hotkey escapes auto mode");
+        assert!(!m.auto, "and disables it for the session");
+
+        // Manual on while auto is also active: still a single press to release.
+        let mut m = mode();
+        m.remote_hidden = true;
+        m.manual = true;
+        m.toggle();
+        assert!(!m.relative());
+    }
+
+    #[test]
+    fn view_only_never_grabs_the_mouse() {
+        let mut m = MouseMode { control: false, ..mode() };
+        m.remote_hidden = true;
+        m.toggle();
+        assert!(!m.relative());
+    }
+
+    #[test]
+    fn raw_delta_accumulation() {
+        let mut acc = (0.4, -0.6);
+        assert_eq!(take_whole_counts(&mut acc), None);
+        acc.0 += 0.7; // 1.1
+        acc.1 -= 0.6; // -1.2
+        assert_eq!(take_whole_counts(&mut acc), Some((1, -1)));
+        assert!((acc.0 - 0.1).abs() < 1e-9 && (acc.1 + 0.2).abs() < 1e-9);
+        let mut huge = (1e9, 0.0);
+        assert_eq!(take_whole_counts(&mut huge), Some((MAX_RELATIVE_DELTA as i32, 0)));
     }
 }

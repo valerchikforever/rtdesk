@@ -25,6 +25,11 @@ updated: 2026-11-05
 | `apps/host` | Host agent (portable attended mode) | [[Host Agent]] |
 | `apps/viewer` | Viewer (winit + softbuffer) | [[Viewer Client]] |
 
+## Gamepads & relative mouse (2026-11-05)
+Implemented per [[ADR-008 Gamepad and Relative Mouse]]: protocol messages, host-side validation (CONTROL only), relative `SendInput`, cursor-visibility reporting, ViGEmBus virtual Xbox 360 pads (session-scoped), viewer pointer lock with raw deltas, auto mode + Ctrl+Alt+M, `gilrs` gamepad polling with neutral state on focus loss.
+- Verified: 48 unit tests (incl. permission/range checks, mode switching, delta accumulation), clippy, cargo-deny, fuzz targets updated.
+- **Not yet verified live:** needs two PCs (single-PC relative mode loops back through raw input) plus a gamepad and ViGEmBus on the host.
+
 ## Requirements coverage
 | ID | Status | Notes |
 |---|---|---|

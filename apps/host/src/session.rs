@@ -9,11 +9,12 @@ use bridge_codec::TileEncoder;
 use bridge_crypto::keys::{self, PublicKey};
 use bridge_crypto::pake::{self, PakeContext, Role};
 use bridge_net::endpoint::{channel_binding, peer_key};
-use bridge_platform::{Consent, InputEvent};
+use bridge_platform::{Consent, GamepadInput, InputEvent};
+use bridge_proto::features;
 use bridge_proto::framing::{read_msg, write_msg, MAX_CLIPBOARD_TEXT, MAX_CONTROL};
 use bridge_proto::msg::control::Kind;
 use bridge_proto::msg::{
-    Bye, ClipboardText, Control, FrameUpdate, PakeConfirm, PakeMsg, SessionDenied, SessionGranted,
+    Bye, ClipboardText, Control, CursorState, FrameUpdate, PakeConfirm, PakeMsg, SessionDenied, SessionGranted,
 };
 use bridge_session::{FailureOutcome, HostSession, Permissions};
 use quinn::{Connection, RecvStream, SendStream};
@@ -112,10 +113,14 @@ pub async fn run(ctx: Arc<HostCtx>, conn: Connection, permit: OwnedSemaphorePerm
     };
     sm.grant(perms)?;
     let (width, height) = bridge_platform::screen_size();
-    send_ctrl(&mut send, Kind::Granted(SessionGranted { permissions: perms.0, width, height })).await?;
-    info!(%remote, permissions = perms.0, "session started");
+    let mut features = features::RELATIVE_MOUSE;
+    if perms.contains(Permissions::CONTROL) && tokio::task::spawn_blocking(bridge_platform::gamepad_available).await? {
+        features |= features::GAMEPAD;
+    }
+    send_ctrl(&mut send, Kind::Granted(SessionGranted { permissions: perms.0, width, height, features })).await?;
+    info!(%remote, permissions = perms.0, gamepad = features & features::GAMEPAD != 0, "session started");
 
-    active(conn, send, recv, sm, &fingerprint).await
+    active(conn, send, recv, sm, &fingerprint, features).await
 }
 
 async fn authenticate(
@@ -165,6 +170,7 @@ async fn active(
     mut recv: RecvStream,
     mut sm: HostSession,
     fingerprint: &str,
+    features: u32,
 ) -> Result<()> {
     let perms = sm.permissions();
     let send: SharedSend = Arc::new(Mutex::new(send));
@@ -203,6 +209,14 @@ async fn active(
     let last_clip = Arc::new(std::sync::Mutex::new(read_clipboard().unwrap_or_default()));
     let clip_task =
         perms.contains(Permissions::CLIPBOARD).then(|| tokio::spawn(clipboard_watch(send.clone(), last_clip.clone())));
+    // Lets the viewer switch to relative (pointer-lock) mode when a game / 3D viewport hides the cursor.
+    let cursor_task = perms.contains(Permissions::CONTROL).then(|| tokio::spawn(cursor_watch(send.clone())));
+    // Virtual pads live on their own thread and are unplugged when `pad_tx` is dropped (session end).
+    let pad_tx = (features & features::GAMEPAD != 0).then(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<GamepadInput>();
+        let _ = std::thread::Builder::new().name("gamepads".into()).spawn(move || gamepad_loop(rx));
+        tx
+    });
 
     let reason = loop {
         tokio::select! {
@@ -215,6 +229,23 @@ async fn active(
                 }
                 match kind {
                     Kind::MouseMove(m) => inject(InputEvent::MouseMove { x: m.x, y: m.y }),
+                    Kind::MouseMoveRelative(m) => inject(InputEvent::MouseMoveRelative { dx: m.dx, dy: m.dy }),
+                    Kind::Gamepad(g) => {
+                        if let Some(tx) = &pad_tx {
+                            // Values were range-checked by `sm.admit`, so the narrowing casts are lossless.
+                            let _ = tx.send(GamepadInput {
+                                index: g.index as usize,
+                                connected: g.connected,
+                                buttons: g.buttons as u16,
+                                left_trigger: g.left_trigger as u8,
+                                right_trigger: g.right_trigger as u8,
+                                left_x: g.left_x as i16,
+                                left_y: g.left_y as i16,
+                                right_x: g.right_x as i16,
+                                right_y: g.right_y as i16,
+                            });
+                        }
+                    }
                     Kind::MouseButton(b) => inject(InputEvent::MouseButton { button: b.button, down: b.down }),
                     Kind::MouseWheel(w) => inject(InputEvent::Wheel { dx: w.dx, dy: w.dy }),
                     Kind::Key(k) => inject(InputEvent::Key { scancode: k.scancode, down: k.down }),
@@ -241,9 +272,10 @@ async fn active(
 
     stop.store(true, Ordering::SeqCst);
     video_task.abort();
-    if let Some(t) = clip_task {
+    for t in [clip_task, cursor_task].into_iter().flatten() {
         t.abort();
     }
+    drop(pad_tx); // unplugs virtual gamepads
     sm.close();
     conn.close(0u32.into(), b"bye");
     bridge_platform::close_dialog(&title);
@@ -251,9 +283,44 @@ async fn active(
     Ok(())
 }
 
+/// Report remote cursor visibility changes (polled; cheap Win32 call).
+async fn cursor_watch(send: SharedSend) {
+    let mut tick = tokio::time::interval(Duration::from_millis(100));
+    let mut last: Option<bool> = None;
+    loop {
+        tick.tick().await;
+        let visible = bridge_platform::cursor_visible();
+        if last == Some(visible) {
+            continue;
+        }
+        last = Some(visible);
+        let mut s = send.lock().await;
+        if send_ctrl(&mut s, Kind::CursorState(CursorState { visible })).await.is_err() {
+            return;
+        }
+    }
+}
+
+fn gamepad_loop(rx: std::sync::mpsc::Receiver<GamepadInput>) {
+    let mut pads = match bridge_platform::VirtualGamepads::new() {
+        Ok(p) => p,
+        Err(e) => {
+            warn!("gamepads unavailable: {e}");
+            return;
+        }
+    };
+    info!("virtual gamepad support active");
+    while let Ok(input) = rx.recv() {
+        if let Err(e) = pads.update(&input) {
+            warn!(index = input.index, "gamepad: {e}");
+        }
+    }
+    info!("virtual gamepads unplugged");
+}
+
 fn describe(p: Permissions) -> &'static str {
     if p.contains(Permissions::CONTROL) {
-        "full control (mouse, keyboard, clipboard)"
+        "full control (mouse, keyboard, gamepad, clipboard)"
     } else {
         "view only"
     }

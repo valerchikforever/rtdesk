@@ -193,6 +193,11 @@ pub fn inject(ev: InputEvent) -> Result<()> {
             let ny = (y * 65_535 / i64::from((v.h - 1).max(1))) as i32;
             mouse(nx, ny, 0, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK)
         }
+        // Without MOUSEEVENTF_ABSOLUTE, dx/dy are relative counts: games and 3D apps reading Raw Input
+        // receive exactly these deltas, independent of the cursor position.
+        InputEvent::MouseMoveRelative { dx, dy } => {
+            mouse(dx.clamp(-10_000, 10_000), dy.clamp(-10_000, 10_000), 0, MOUSEEVENTF_MOVE)
+        }
         InputEvent::MouseButton { button, down } => {
             let flags = match (button, down) {
                 (1, true) => MOUSEEVENTF_LEFTDOWN,
@@ -264,6 +269,16 @@ fn send(inputs: &[INPUT]) -> Result<()> {
 /// Title of the consent dialog (used to close it on timeout / viewer departure).
 pub const CONSENT_TITLE: &str = "Bridge — incoming remote access request";
 
+/// Is the system cursor currently shown? Games and 3D viewports hide it while capturing the mouse.
+pub fn cursor_visible() -> bool {
+    let mut ci = CURSORINFO { cbSize: std::mem::size_of::<CURSORINFO>() as u32, ..Default::default() };
+    // SAFETY: `ci` is a properly sized, writable CURSORINFO.
+    match unsafe { GetCursorInfo(&mut ci) } {
+        Ok(()) => ci.flags == CURSOR_SHOWING,
+        Err(_) => true, // e.g. secure desktop: assume visible, keep absolute mode
+    }
+}
+
 /// Consent dialog (SEC: SR-05, AS-01). Default button is "Cancel" = reject, to resist consent fatigue.
 pub fn ask_consent(viewer_fingerprint: &str, remote_addr: &str) -> Consent {
     let text = format!(
@@ -273,7 +288,7 @@ pub fn ask_consent(viewer_fingerprint: &str, remote_addr: &str) -> Consent {
          WARNING: never allow access to someone who contacted you unexpectedly \
          (phone call, pop-up, e-mail, social media). Banks, Microsoft, police and \
          \"technical support\" never ask you for this.\n\n\
-         Yes  —  allow FULL CONTROL (mouse, keyboard, clipboard)\n\
+         Yes  —  allow FULL CONTROL (mouse, keyboard, gamepad, clipboard)\n\
          No  —  allow VIEW ONLY\n\
          Cancel  —  reject"
     );

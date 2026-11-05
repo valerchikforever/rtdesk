@@ -56,6 +56,19 @@ stateDiagram-v2
     Active --> Closed: disconnect / host terminates / idle timeout
 ```
 
+## Input messages (control stream)
+| Message | Direction | Permission | Validation |
+|---|---|---|---|
+| `MouseMove{x,y}` | viewer → host | CONTROL | clamped to screen |
+| `MouseMoveRelative{dx,dy}` | viewer → host | CONTROL | \|d\| ≤ 10 000 |
+| `MouseButton`, `MouseWheel` | viewer → host | CONTROL | button 1–3, wheel clamped |
+| `Key{scancode}` | viewer → host | CONTROL | set-1 scancode, prefix 0/E0/E1 |
+| `Gamepad{index,…}` | viewer → host | CONTROL | index < 4, known XInput bits, ranges |
+| `CursorState{visible}` | host → viewer | — | from a viewer: protocol violation |
+| `SessionGranted.features` | host → viewer | — | bit 0 relative mouse, bit 1 gamepad |
+
+See [[ADR-008 Gamepad and Relative Mouse]].
+
 ## Permission enforcement
 Permissions are enforced **on the host** at the dispatcher: each handler (input, clipboard, file, terminal) checks the current granted permission set. The viewer UI merely reflects them. Example: when `files=false`, the file-transfer stream handler is never registered for that session.
 

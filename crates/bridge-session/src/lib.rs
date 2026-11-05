@@ -59,6 +59,27 @@ pub enum Violation {
     InvalidValue(&'static str),
 }
 
+/// Largest accepted relative mouse step (raw counts per message).
+pub const MAX_RELATIVE_DELTA: u32 = 10_000;
+
+fn validate_gamepad(g: &bridge_proto::msg::GamepadState) -> Result<(), Violation> {
+    use bridge_proto::gamepad::{ALL_BUTTONS, MAX_PADS};
+    let stick = |v: i32| (-32_768..=32_767).contains(&v);
+    let valid = g.index < MAX_PADS
+        && g.buttons & !ALL_BUTTONS == 0
+        && g.left_trigger <= 255
+        && g.right_trigger <= 255
+        && stick(g.left_x)
+        && stick(g.left_y)
+        && stick(g.right_x)
+        && stick(g.right_y);
+    if valid {
+        Ok(())
+    } else {
+        Err(Violation::InvalidValue("Gamepad"))
+    }
+}
+
 #[derive(Debug)]
 pub struct HostSession {
     phase: Phase,
@@ -146,6 +167,17 @@ impl HostSession {
                     return Err(Violation::TooLarge("Clipboard"));
                 }
                 Ok(())
+            }
+            (Active, Kind::MouseMoveRelative(m)) => {
+                self.require(Permissions::CONTROL, kind)?;
+                if m.dx.unsigned_abs() > MAX_RELATIVE_DELTA || m.dy.unsigned_abs() > MAX_RELATIVE_DELTA {
+                    return Err(Violation::InvalidValue("MouseMoveRelative"));
+                }
+                Ok(())
+            }
+            (Active, Kind::Gamepad(g)) => {
+                self.require(Permissions::CONTROL, kind)?;
+                validate_gamepad(g)
             }
             (phase, k) => Err(Violation::Unexpected { msg: k.name(), phase }),
         }
@@ -264,7 +296,7 @@ mod tests {
     #[test]
     fn host_side_messages_from_viewer_are_violations() {
         let mut s = active(Permissions::ALL);
-        assert!(s.admit(&Kind::Granted(SessionGranted { permissions: 7, width: 1, height: 1 })).is_err());
+        assert!(s.admit(&Kind::Granted(SessionGranted { permissions: 7, width: 1, height: 1, features: 0 })).is_err());
     }
 
     #[test]
@@ -283,6 +315,50 @@ mod tests {
         assert_eq!(s.permissions(), Permissions::VIEW);
         s.restrict(Permissions::ALL);
         assert_eq!(s.permissions(), Permissions::VIEW);
+    }
+
+    #[test]
+    fn relative_mouse_and_gamepad_need_control() {
+        let rel = Kind::MouseMoveRelative(MouseMoveRelative { dx: 5, dy: -3 });
+        let pad = Kind::Gamepad(GamepadState {
+            index: 1,
+            connected: true,
+            buttons: 0x1000,
+            left_x: -32768,
+            ..Default::default()
+        });
+        let mut s = active(Permissions::ALL);
+        s.admit(&rel).unwrap();
+        s.admit(&pad).unwrap();
+        for k in [rel.clone(), pad.clone()] {
+            let mut s = active(Permissions::VIEW);
+            assert!(matches!(s.admit(&k), Err(Violation::NotPermitted(_))));
+        }
+        // Not before consent either.
+        let mut s = HostSession::new();
+        assert!(s.admit(&pad).is_err());
+    }
+
+    #[test]
+    fn invalid_relative_and_gamepad_values() {
+        let bad = [
+            Kind::MouseMoveRelative(MouseMoveRelative { dx: 1_000_000, dy: 0 }),
+            Kind::MouseMoveRelative(MouseMoveRelative { dx: 0, dy: i32::MIN }),
+            Kind::Gamepad(GamepadState { index: 4, connected: true, ..Default::default() }),
+            Kind::Gamepad(GamepadState { index: 0, buttons: 0x0800, ..Default::default() }),
+            Kind::Gamepad(GamepadState { index: 0, left_trigger: 256, ..Default::default() }),
+            Kind::Gamepad(GamepadState { index: 0, right_y: 40_000, ..Default::default() }),
+        ];
+        for k in bad {
+            let mut s = active(Permissions::ALL);
+            assert!(s.admit(&k).is_err(), "{k:?}");
+        }
+    }
+
+    #[test]
+    fn cursor_state_from_viewer_is_a_violation() {
+        let mut s = active(Permissions::ALL);
+        assert!(s.admit(&Kind::CursorState(CursorState { visible: false })).is_err());
     }
 
     #[test]

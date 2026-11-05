@@ -69,6 +69,7 @@ updated: 2026-11-05
 - [[ADR-005 Relay Is Blind]]
 - [[ADR-006 Free and Open Source Licensing]]
 - [[ADR-007 MVP Screen Codec]]
+- [[ADR-008 Gamepad and Relative Mouse]]
 
 ### 08 · Implementation
 - [[Implementation Status]] — what is built, test evidence, deviations, next steps

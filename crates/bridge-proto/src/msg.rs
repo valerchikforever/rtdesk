@@ -35,6 +35,9 @@ pub struct SessionGranted {
     pub width: u32,
     #[prost(uint32, tag = "3")]
     pub height: u32,
+    /// Optional host capabilities, see [`crate::features`].
+    #[prost(uint32, tag = "4")]
+    pub features: u32,
 }
 
 #[derive(Clone, PartialEq, Message)]
@@ -90,10 +93,63 @@ pub struct Bye {
     pub reason: String,
 }
 
+/// Relative pointer motion in raw mouse counts (pointer-lock mode for games / 3D apps).
+#[derive(Clone, PartialEq, Message)]
+pub struct MouseMoveRelative {
+    #[prost(int32, tag = "1")]
+    pub dx: i32,
+    #[prost(int32, tag = "2")]
+    pub dy: i32,
+}
+
+/// Host → viewer: whether the remote system cursor is visible. Games and 3D viewports hide it
+/// while they capture the mouse; the viewer then switches to relative mode automatically.
+#[derive(Clone, PartialEq, Message)]
+pub struct CursorState {
+    #[prost(bool, tag = "1")]
+    pub visible: bool,
+}
+
+/// Full state of one gamepad in XInput layout (sent on every change).
+#[derive(Clone, PartialEq, Eq, Message)]
+pub struct GamepadState {
+    /// Pad slot 0..=3.
+    #[prost(uint32, tag = "1")]
+    pub index: u32,
+    /// `false` unplugs the virtual pad on the host.
+    #[prost(bool, tag = "2")]
+    pub connected: bool,
+    /// XInput button bits, see [`crate::gamepad`].
+    #[prost(uint32, tag = "3")]
+    pub buttons: u32,
+    /// 0..=255
+    #[prost(uint32, tag = "4")]
+    pub left_trigger: u32,
+    /// 0..=255
+    #[prost(uint32, tag = "5")]
+    pub right_trigger: u32,
+    /// -32768..=32767, +Y is up.
+    #[prost(sint32, tag = "6")]
+    pub left_x: i32,
+    #[prost(sint32, tag = "7")]
+    pub left_y: i32,
+    #[prost(sint32, tag = "8")]
+    pub right_x: i32,
+    #[prost(sint32, tag = "9")]
+    pub right_y: i32,
+}
+
+impl GamepadState {
+    /// All buttons released, sticks centred — sent on focus loss so nothing stays pressed.
+    pub fn neutral(index: u32) -> Self {
+        Self { index, connected: true, ..Default::default() }
+    }
+}
+
 /// Envelope for everything on the reliable control stream.
 #[derive(Clone, PartialEq, Message)]
 pub struct Control {
-    #[prost(oneof = "control::Kind", tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11")]
+    #[prost(oneof = "control::Kind", tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14")]
     pub kind: Option<control::Kind>,
 }
 
@@ -122,6 +178,12 @@ pub mod control {
         Clipboard(super::ClipboardText),
         #[prost(message, tag = "11")]
         Bye(super::Bye),
+        #[prost(message, tag = "12")]
+        MouseMoveRelative(super::MouseMoveRelative),
+        #[prost(message, tag = "13")]
+        CursorState(super::CursorState),
+        #[prost(message, tag = "14")]
+        Gamepad(super::GamepadState),
     }
 
     impl Kind {
@@ -139,6 +201,9 @@ pub mod control {
                 Kind::Key(_) => "Key",
                 Kind::Clipboard(_) => "Clipboard",
                 Kind::Bye(_) => "Bye",
+                Kind::MouseMoveRelative(_) => "MouseMoveRelative",
+                Kind::CursorState(_) => "CursorState",
+                Kind::Gamepad(_) => "Gamepad",
             }
         }
     }
