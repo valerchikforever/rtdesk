@@ -25,6 +25,19 @@ updated: 2026-11-05
 | `apps/host` | Host agent (portable attended mode) | [[Host Agent]] |
 | `apps/viewer` | Viewer (winit + softbuffer) | [[Viewer Client]] |
 
+## Platform matrix (v0.2.0, 2026-11-05)
+| Platform | Host (being accessed) | Viewer | Servers | Built in CI | Tested live |
+|---|---|---|---|---|---|
+| Windows 10/11 x64 | ✅ | ✅ | ✅ | ✅ | ✅ (single PC) |
+| macOS 11+ universal | ❌ (ScreenCaptureKit + CGEvent, Beta) | ✅ | ✅ | ✅ | ❌ |
+| Linux x64 / ARM64 | ❌ (PipeWire portal / X11, Beta) | ✅ | ✅ | ✅ | ❌ |
+| Android | ❌ (MediaProjection + Accessibility, v1.x) | ❌ needs touch UI | — | ❌ | ❌ |
+| iOS | not possible (no screen-control APIs) | ❌ needs touch UI + Apple Developer account | — | ❌ | ❌ |
+
+Viewer keyboard uses a portable `KeyCode → set-1 scancode` table (`apps/viewer/src/keymap.rs`); on macOS Command → Windows key, Option → Alt.
+
+**Mobile viewer prerequisites:** a GUI for ID/code entry (no console on phones — [[ADR-004 UI Framework]]), touch-to-mouse modes and an on-screen keyboard, Android NDK build + signing key, and for iOS a Mac build host and a paid Apple Developer account (TestFlight/App Store). Binaries are unsigned: Windows SignPath, Apple notarization pending.
+
 ## Gamepads & relative mouse (2026-11-05)
 Implemented per [[ADR-008 Gamepad and Relative Mouse]]: protocol messages, host-side validation (CONTROL only), relative `SendInput`, cursor-visibility reporting, ViGEmBus virtual Xbox 360 pads (session-scoped), viewer pointer lock with raw deltas, auto mode + Ctrl+Alt+M, `gilrs` gamepad polling with neutral state on focus loss.
 - Verified: 48 unit tests (incl. permission/range checks, mode switching, delta accumulation), clippy, cargo-deny, fuzz targets updated.
