@@ -1,6 +1,6 @@
 name: Release
 
-# Push a tag like v0.1.0 to build binaries and create a DRAFT release.
+# Push a tag like v0.2.0 to build binaries and create a DRAFT release.
 # A maintainer reviews the draft (checksums, notes) before publishing it.
 on:
   push:
@@ -14,52 +14,94 @@ env:
 
 jobs:
   build:
-    name: Build ${{ matrix.target }}
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       id-token: write      # build provenance (SLSA) attestation
       attestations: write
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            packages: -p bridge-host -p bridge-viewer -p bridge-rendezvous -p bridge-relay
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            packages: -p bridge-rendezvous -p bridge-relay
+          # Windows: host (the PC being accessed) + viewer + servers
+          - name: windows-x64
+            os: windows-latest
+            bins: bridge-host bridge-viewer bridge-rendezvous bridge-relay
+          # macOS: viewer + servers, universal binary (Apple Silicon + Intel)
+          - name: macos-universal
+            os: macos-latest
+            bins: bridge-viewer bridge-rendezvous bridge-relay
+          # Linux: viewer + servers; built on 22.04 for compatibility with older glibc (Debian 12+, Ubuntu 22.04+)
+          - name: linux-x64
+            os: ubuntu-22.04
+            bins: bridge-viewer bridge-rendezvous bridge-relay
+          # Linux ARM64: e.g. a Raspberry Pi 4/5 as a self-hosted server
+          - name: linux-arm64
+            os: ubuntu-22.04-arm
+            bins: bridge-viewer bridge-rendezvous bridge-relay
+    env:
+      PKG: bridge-${{ github.ref_name }}-${{ matrix.name }}
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: System libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
       - name: Install toolchain (rust-toolchain.toml)
         run: rustup toolchain install
+
       # No build cache on purpose: release builds start clean.
-      - name: Build
-        run: cargo build --release --locked ${{ matrix.packages }}
+      - name: Build (Windows / Linux)
+        if: runner.os != 'macOS'
+        shell: bash
+        run: cargo build --release --locked $(printf -- '-p %s ' ${{ matrix.bins }})
+      - name: Build universal binaries (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          args=$(printf -- '-p %s ' ${{ matrix.bins }})
+          cargo build --release --locked --target aarch64-apple-darwin $args
+          cargo build --release --locked --target x86_64-apple-darwin $args
+          mkdir -p target/release
+          for b in ${{ matrix.bins }}; do
+            lipo -create -output "target/release/$b" \
+              "target/aarch64-apple-darwin/release/$b" "target/x86_64-apple-darwin/release/$b"
+            codesign --force --sign - "target/release/$b"   # ad-hoc signature (not notarized)
+            lipo -info "target/release/$b"
+          done
+
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $name = "bridge-${{ github.ref_name }}-${{ matrix.target }}"
-          New-Item -ItemType Directory -Force "pkg/$name", dist | Out-Null
-          Copy-Item target/release/bridge-*.exe, LICENSE, README.md, SECURITY.md "pkg/$name/"
-          Compress-Archive -Path "pkg/$name/*" -DestinationPath "dist/$name.zip"
+          New-Item -ItemType Directory -Force "pkg/$env:PKG", dist | Out-Null
+          foreach ($b in "${{ matrix.bins }}".Split(" ")) { Copy-Item "target/release/$b.exe" "pkg/$env:PKG/" }
+          Copy-Item LICENSE, README.md, SECURITY.md "pkg/$env:PKG/"
+          Compress-Archive -Path "pkg/$env:PKG/*" -DestinationPath "dist/$env:PKG.zip"
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p "pkg/$PKG" dist
+          for b in ${{ matrix.bins }}; do cp "target/release/$b" "pkg/$PKG/"; done
+          cp LICENSE README.md SECURITY.md "pkg/$PKG/"
+          ditto -c -k --keepParent "pkg/$PKG" "dist/$PKG.zip"
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          name="bridge-${{ github.ref_name }}-${{ matrix.target }}"
-          mkdir -p "pkg/$name" dist
-          cp target/release/bridge-rendezvous target/release/bridge-relay LICENSE README.md SECURITY.md "pkg/$name/"
-          tar -C pkg -czf "dist/$name.tar.gz" "$name"
+          mkdir -p "pkg/$PKG" dist
+          for b in ${{ matrix.bins }}; do cp "target/release/$b" "pkg/$PKG/"; done
+          cp LICENSE README.md SECURITY.md "pkg/$PKG/"
+          tar -C pkg -czf "dist/$PKG.tar.gz" "$PKG"
+
       - uses: actions/attest-build-provenance@v1
         with:
           subject-path: dist/*
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.target }}
+          name: dist-${{ matrix.name }}
           path: dist/*
 
   release:
@@ -83,7 +125,17 @@ jobs:
           body: |
             Bridge is free and open-source software (AGPL-3.0).
 
+            | Download | Contains |
+            |---|---|
+            | `windows-x64.zip` | **host** (PC to be accessed), viewer, servers |
+            | `macos-universal.zip` | viewer, servers (Apple Silicon + Intel, macOS 11+) |
+            | `linux-x64.tar.gz` / `linux-arm64.tar.gz` | viewer, servers |
+
+            The host (being accessed) is Windows-only for now; macOS/Linux hosts and mobile apps are on the roadmap.
+
             **Verify your download:** compare with `SHA256SUMS`, and check build provenance with
             `gh attestation verify <file> --repo ${{ github.repository }}`.
 
-            Windows binaries are not yet code-signed (planned via SignPath Foundation), so SmartScreen may warn.
+            Binaries are not yet code-signed/notarized:
+            - Windows: SmartScreen may warn ("More info" → "Run anyway").
+            - macOS: run `xattr -dr com.apple.quarantine <folder>` once after unpacking.

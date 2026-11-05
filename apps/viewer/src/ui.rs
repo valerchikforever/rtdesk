@@ -30,7 +30,6 @@ use winit::dpi::LogicalSize;
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
-use winit::platform::scancode::PhysicalKeyExtScancode;
 use winit::window::{CursorGrabMode, Window, WindowId};
 
 use crate::connect::Session;
@@ -388,6 +387,20 @@ fn blit(dst: &mut [u32], dw: usize, dh: usize, src: &FrameSlot) -> Viewport {
     Viewport { ox, oy, w: tw, h: th, src_w: sw, src_h: sh }
 }
 
+/// Portable table first; on Windows fall back to the native set-1 scancode for rare keys.
+fn key_scancode(key: PhysicalKey) -> Option<u32> {
+    let mapped = match key {
+        PhysicalKey::Code(code) => crate::keymap::scancode(code),
+        PhysicalKey::Unidentified(_) => None,
+    };
+    #[cfg(windows)]
+    let mapped = mapped.or_else(|| {
+        use winit::platform::scancode::PhysicalKeyExtScancode;
+        key.to_scancode().filter(|&sc| sc != 0)
+    });
+    mapped
+}
+
 /// Split accumulated raw deltas into whole counts to send and the remainder to keep.
 fn take_whole_counts(acc: &mut (f64, f64)) -> Option<(i32, i32)> {
     let max = f64::from(MAX_RELATIVE_DELTA);
@@ -527,10 +540,7 @@ impl ApplicationHandler<UserEvent> for App {
                     }
                     return;
                 }
-                let Some(sc) = event.physical_key.to_scancode() else { return };
-                if sc == 0 {
-                    return;
-                }
+                let Some(sc) = key_scancode(event.physical_key) else { return };
                 if down {
                     self.pressed.insert(sc);
                 } else {

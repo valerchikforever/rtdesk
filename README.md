@@ -81,7 +81,8 @@ docker run -d --name bridge-relay -p 21117:21117/udp -v bridge-data:/data bridge
 ```
 
 ## Known MVP limitations
-- Windows only for host and viewer; macOS/Linux/mobile come in the Beta phase.
+- Host (the computer being accessed): Windows only. Viewer: Windows, macOS, Linux.
+  macOS/Linux hosts and Android/iOS apps are planned (Beta / v1.x).
 - Portable/attended mode: no unattended access, no control of UAC prompts or elevated windows yet.
   Games running as administrator or with anti-cheat may ignore injected input.
 - Codec: JPEG dirty-tiles (patent-free, CPU); hardware H.264/HEVC/AV1 is planned.
@@ -89,8 +90,22 @@ docker run -d --name bridge-relay -p 21117:21117/udp -v bridge-data:/data bridge
 - IPv4 only.
 
 ## Downloads
-Pre-built binaries are attached to [GitHub Releases](https://github.com/valerchikforever/rtdesk/releases).
-Verify them before use:
+Pre-built binaries are attached to [GitHub Releases](https://github.com/valerchikforever/rtdesk/releases):
+
+| Platform | File | Contains |
+|---|---|---|
+| Windows 10/11 x64 | `bridge-<ver>-windows-x64.zip` | host, viewer, rendezvous, relay |
+| macOS 11+ (Apple Silicon & Intel) | `bridge-<ver>-macos-universal.zip` | viewer, rendezvous, relay |
+| Linux x64 (glibc 2.35+) | `bridge-<ver>-linux-x64.tar.gz` | viewer, rendezvous, relay |
+| Linux ARM64 (e.g. Raspberry Pi) | `bridge-<ver>-linux-arm64.tar.gz` | viewer, rendezvous, relay |
+
+Not yet code-signed: on Windows SmartScreen may warn; on macOS run once after unpacking
+```bash
+xattr -dr com.apple.quarantine bridge-*-macos-universal
+```
+On macOS the Command key is sent as the Windows key and Option as Alt.
+
+Verify downloads before use:
 ```bash
 sha256sum -c SHA256SUMS
 ```

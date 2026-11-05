@@ -2,6 +2,7 @@
 
 mod connect;
 mod gamepad;
+mod keymap;
 mod ui;
 
 use std::path::PathBuf;
